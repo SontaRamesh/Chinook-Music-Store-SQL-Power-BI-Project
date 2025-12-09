@@ -1,0 +1,97 @@
+Dax Measures
+
+--created a customer spend table in powerbi
+
+CustomerSpend = 
+VAR base =
+    SUMMARIZECOLUMNS(
+        'public customer'[customer_id],
+        'public customer'[first_name],
+        'public customer'[last_name],
+        "TotalSpend",
+            CALCULATE(
+                SUMX( 'public invoice_line', 'public invoice_line'[quantity] * 'public invoice_line'[unit_price] )
+            )
+    )
+VAR p80 = 
+    // Use percentile cutoff if available (keeps ties together)
+    PERCENTILEX.INC( base, [TotalSpend], 0.8 )
+RETURN
+ADDCOLUMNS(
+    base,
+    "FullName", TRIM( [first_name] & " " & [last_name] ),
+    "SpenderType", IF( [TotalSpend] >= p80, "High Spender", "Low Spender" )
+)
+
+------------------------------------------------------------------------------------------------------------------------------------------
+dax measures in customer spend table
+
+1)Customer Rank = 
+RANKX(
+    ALLSELECTED( CustomerSpend[customer_id] ),
+    CALCULATE( SUM( CustomerSpend[TotalSpend] ) ),
+    ,
+    DESC,
+    DENSE
+)
+
+2)Cumulative Revenue = 
+VAR CurRank = [Customer Rank]
+RETURN
+CALCULATE(
+    SUM( CustomerSpend[TotalSpend] ),
+    FILTER(
+        ALLSELECTED( CustomerSpend ),
+        [Customer Rank] <= CurRank
+    )
+)
+
+3)Cumulative % = 
+DIVIDE( [Cumulative Revenue], [Total Revenue], 0 )
+
+------------------------------------------------------------------------------------------------------------------------------------------
+overall dax measures
+
+1)Customer Count = DISTINCTCOUNT( 'public customer'[customer_id] )
+
+2)Total Revenue = SUM('public invoice'[total])
+
+3)Total Invoices = COUNTROWS( 'public invoice' )
+
+4)AOV = 
+VAR rev = [Total Revenue]
+VAR orders = [Total Invoices]
+RETURN
+DIVIDE( rev, orders, 0 )
+
+5)TopN_Customers = ROUNDUP( [Customer Count] * 0.20, 0 )
+
+6)Top20 Revenue by Count = 
+VAR N = [TopN_Customers]
+VAR CustTable =
+    TOPN(
+        N,
+        ADDCOLUMNS(
+            VALUES( 'public customer'[customer_id] ),
+            "Spend", CALCULATE( SUM( 'public invoice'[total]) )
+        ),
+        [Spend], DESC
+    )
+RETURN
+SUMX( CustTable, [Spend] )
+
+7)Pct Revenue From Top20 (Count) = 
+DIVIDE( [Top20 Revenue by Count], [Total Revenue], 0 )
+
+8)Track Revenue = 
+SUMX(
+    FILTER(
+        'public invoice_line',
+        'public invoice_line'[track_id] = SELECTEDVALUE('public track'[track_id])
+    ),
+    'public invoice_line'[quantity] * 'public invoice_line'[unit_price]
+)
+
+------------------------------------------------------------------------------------------------------------------------------------------
+end
+
