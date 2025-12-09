@@ -60,7 +60,7 @@ The relational structure makes it ideal for real-world business analytics such a
 ---
 
 ## 📈 Dashboard Preview 
-![Dashboard](PowerBI/Dashboard_screenshots/overview.png)
+![Dashboard](Chinook-SQL-PowerBI-Project/PowerBi/Dashboard.png)
 
 ---
 
